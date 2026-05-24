@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY')
+app.secret_key = os.getenv('SECRET_KEY', 'clave_secreta_por_defecto_123')
 
 # ==========================================
 # GESTIÓN DE USUARIOS (AUTENTICACIÓN)
@@ -28,9 +28,9 @@ def registro():
         conexion = obtener_conexion()
         if conexion:
             try:
-                with conexion.cursor() as cursor:
-                    sql = "INSERT INTO usuarios (nombre_usuario, contrasena_hash, rol) VALUES (%s, %s, %s)"
-                    cursor.execute(sql, (usuario, contrasena_segura, rol))
+                cursor = conexion.cursor()
+                sql = "INSERT INTO usuarios (nombre_usuario, contrasena_hash, rol) VALUES (?, ?, ?)"
+                cursor.execute(sql, (usuario, contrasena_segura, rol))
                 conexion.commit()
                 return "¡Usuario registrado con éxito! <a href='/login'>Inicia sesión aquí</a>"
             except Exception as e:
@@ -48,10 +48,10 @@ def login():
         conexion = obtener_conexion()
         if conexion:
             try:
-                with conexion.cursor() as cursor:
-                    sql = "SELECT id, nombre_usuario, contrasena_hash, rol FROM usuarios WHERE nombre_usuario = %s"
-                    cursor.execute(sql, (usuario,))
-                    resultado = cursor.fetchone()
+                cursor = conexion.cursor()
+                sql = "SELECT id, nombre_usuario, contrasena_hash, rol FROM usuarios WHERE nombre_usuario = ?"
+                cursor.execute(sql, (usuario,))
+                resultado = cursor.fetchone()
                 
                 if resultado and check_password_hash(resultado['contrasena_hash'], contrasena):
                     session['usuario_id'] = resultado['id']
@@ -83,10 +83,9 @@ def inicio():
     productos = []
     if conexion:
         try:
-            with conexion.cursor() as cursor:
-                # Usamos stock_actual para listar en la tabla principal
-                cursor.execute("SELECT id, nombre, descripcion, precio, stock_actual FROM productos")
-                productos = cursor.fetchall()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id, nombre, descripcion, precio, stock_actual FROM productos")
+            productos = cursor.fetchall()
         finally:
             conexion.close()
             
@@ -109,10 +108,9 @@ def nuevo_producto():
         conexion = obtener_conexion()
         if conexion:
             try:
-                with conexion.cursor() as cursor:
-                    # Insertamos usando el nombre de columna real 'stock_actual'
-                    sql = "INSERT INTO productos (nombre, descripcion, precio, stock_actual) VALUES (%s, %s, %s, %s)"
-                    cursor.execute(sql, (nombre, descripcion, precio, stock))
+                cursor = conexion.cursor()
+                sql = "INSERT INTO productos (nombre, descripcion, precio, stock_actual) VALUES (?, ?, ?, ?)"
+                cursor.execute(sql, (nombre, descripcion, precio, stock))
                 conexion.commit()
                 flash(f"Producto '{nombre}' agregado exitosamente.")
                 return redirect('/')
@@ -134,22 +132,21 @@ def editar_producto(id):
         return "Error de base de datos."
 
     try:
-        with conexion.cursor() as cursor:
-            if request.method == 'POST':
-                nombre = request.form['nombre'].strip()
-                descripcion = request.form['descripcion'].strip()
-                precio = float(request.form['precio'])
-                stock = int(request.form['stock'])
+        cursor = conexion.cursor()
+        if request.method == 'POST':
+            nombre = request.form['nombre'].strip()
+            descripcion = request.form['descripcion'].strip()
+            precio = float(request.form['precio'])
+            stock = int(request.form['stock'])
 
-                # Actualizamos usando 'stock_actual'
-                sql = "UPDATE productos SET nombre=%s, descripcion=%s, precio=%s, stock_actual=%s WHERE id=%s"
-                cursor.execute(sql, (nombre, descripcion, precio, stock, id))
-                conexion.commit()
-                flash("Producto actualizado correctamente.")
-                return redirect('/')
-            else:
-                cursor.execute("SELECT * FROM productos WHERE id = %s", (id,))
-                producto = cursor.fetchone()
+            sql = "UPDATE productos SET nombre=?, descripcion=?, precio=?, stock_actual=? WHERE id=?"
+            cursor.execute(sql, (nombre, descripcion, precio, stock, id))
+            conexion.commit()
+            flash("Producto actualizado correctamente.")
+            return redirect('/')
+        else:
+            cursor.execute("SELECT * FROM productos WHERE id = ?", (id,))
+            producto = cursor.fetchone()
     finally:
         conexion.close()
 
@@ -166,8 +163,8 @@ def eliminar_producto(id):
     conexion = obtener_conexion()
     if conexion:
         try:
-            with conexion.cursor() as cursor:
-                cursor.execute("DELETE FROM productos WHERE id = %s", (id,))
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM productos WHERE id = ?", (id,))
             conexion.commit()
             flash("Producto eliminado del inventario.")
         finally:

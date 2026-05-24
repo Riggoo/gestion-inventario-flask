@@ -1,22 +1,41 @@
+import sqlite3
 import os
-import pymysql
-from dotenv import load_dotenv
-
-# Cargar las variables del archivo .env
-load_dotenv()
 
 def obtener_conexion():
-    """Establece una conexión segura con la base de datos MySQL."""
-    try:
-        conexion = pymysql.connect(
-            host=os.getenv('DB_HOST'),
-            user=os.getenv('DB_USER'),
-            password=os.getenv('DB_PASSWORD'),
-            database=os.getenv('DB_NAME'),
-            cursorclass=pymysql.cursors.DictCursor 
-        )
-        return conexion
-    except pymysql.MySQLError as e:
-        print(f"Error al conectar a la base de datos: {e}")
-        return None
+    # Se crea un archivo de base de datos local dentro del servidor
+    base_datos = "inventario_produccion.db"
     
+    try:
+        # Conectamos y configuramos para que devuelva diccionarios (igual que hacía PyMySQL)
+        conexion = sqlite3.connect(base_datos)
+        conexion.row_factory = sqlite3.Row
+        
+        cursor = conexion.cursor()
+        
+        # 1. Creamos la tabla de usuarios si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre_usuario TEXT NOT NULL UNIQUE,
+                contrasena_hash TEXT NOT NULL,
+                rol TEXT NOT NULL DEFAULT 'empleado',
+                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # 2. Creamos la tabla de productos si no existe
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS productos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                descripcion TEXT,
+                precio REAL NOT NULL,
+                stock_actual INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+        
+        conexion.commit()
+        return conexion
+    except Exception as e:
+        print(f"Error en la base de datos: {e}")
+        return None
